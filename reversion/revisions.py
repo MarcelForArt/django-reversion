@@ -211,7 +211,10 @@ def _add_to_revision(obj, using, model_db, explicit):
 def add_to_revision(obj, model_db=None):
     model_db = model_db or router.db_for_write(obj.__class__, instance=obj)
     for db in _current_frame().db_versions.keys():
-        _add_to_revision(obj, db, model_db, True)
+        # HACK: added this hack to account for safe-delete, so we don't create a version for deleted
+        # objects, just like we don't for hard-deleted objects and things behave
+        if not (hasattr(obj, 'deleted') and obj.deleted is not None):
+            _add_to_revision(obj, db, model_db, True)
 
 
 def _save_revision(versions, user=None, comment="", meta=(), date_created=None, using=None):

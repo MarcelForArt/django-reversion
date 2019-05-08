@@ -142,6 +142,14 @@ class VersionQuerySet(models.QuerySet):
         # Try to do a faster JOIN.
         model_db = model_db or router.db_for_write(model)
         connection = connections[self.db]
+
+        # Hack: added this hack to account for safe-delete
+        # How about checking that SafeDeleteModel was base class?
+        if hasattr(model, 'deleted'):
+            model_deleted_condition = '"deleted" IS NOT NULL'
+        else:
+            model_deleted_condition = '{model_id} IS NULL'
+
         if self.db == model_db and connection.vendor in ("sqlite", "postgresql", "oracle"):
             content_type = _get_content_type(model, self.db)
             subquery = SubquerySQL(
@@ -152,13 +160,14 @@ class VersionQuerySet(models.QuerySet):
                 WHERE
                     V.{db} = %s AND
                     V.{content_type_id} = %s AND
-                    {model}.{model_id} IS NULL
+                    {model}.{model_deleted_condition}
                 GROUP BY V.{object_id}
                 """.format(
                     id=connection.ops.quote_name("id"),
                     version=connection.ops.quote_name(Version._meta.db_table),
                     model=connection.ops.quote_name(model._meta.db_table),
                     model_id=connection.ops.quote_name(model._meta.pk.db_column or model._meta.pk.attname),
+                    model_deleted_condition=model_deleted_condition,
                     object_id=connection.ops.quote_name("object_id"),
                     str=Version._meta.get_field("object_id").db_type(connection),
                     db=connection.ops.quote_name("db"),
