@@ -224,11 +224,35 @@ def _save_revision(versions, user=None, comment="", meta=(), date_created=None, 
     model_db_pks = defaultdict(lambda: defaultdict(set))
     for version in versions:
         model_db_pks[version._model][version.db].add(version.object_id)
+
+    def _safe_get_pks(model, db, pks):
+        """
+        Hack: helper function for use with django-safedelete package
+        so we avoid committing versions for objects that have already
+        been safe deleted
+
+        See hack in models VersionQuerySet get_deleted too
+        """
+        try:
+            from safedelete.models import is_safedelete_cls
+        except ImportError:
+            is_safedelete_cls = lambda: False
+
+        if is_safedelete_cls(model):
+            # Use the safedelete manager to ensure we exclude "soft-deleted"
+            # obj versions
+            return model._default_manager.using(db).filter(pk__in=pks)\
+                .values_list("pk", flat=True)
+        # Else: not using softdelete for this model so use base manager as in
+        # original django-revision
+        return model._base_manager.using(db).filter(pk__in=pks)\
+            .values_list("pk", flat=True)
+
     model_db_existing_pks = {
         model: {
             db: frozenset(map(
                 force_text,
-                model._base_manager.using(db).filter(pk__in=pks).values_list("pk", flat=True),
+                _safe_get_pks(model, db, pks),
             ))
             for db, pks in db_pks.items()
         }

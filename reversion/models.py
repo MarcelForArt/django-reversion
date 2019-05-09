@@ -143,11 +143,20 @@ class VersionQuerySet(models.QuerySet):
         model_db = model_db or router.db_for_write(model)
         connection = connections[self.db]
 
+        # If safedelete is being used then this function helps
+        # determine if our model is a SafeDeleteModel. If not installed
+        # then never is.
+        try:
+            from safedelete.models import is_safedelete_cls
+        except ImportError:
+            is_safedelete_cls = lambda: False
+
         # Hack: added this hack to account for safe-delete
         # How about checking that SafeDeleteModel was base class?
-        if hasattr(model, 'deleted'):
+        if is_safedelete_cls(model):
             model_deleted_condition = '"deleted" IS NOT NULL'
         else:
+            # The usual
             model_deleted_condition = '{model_id} IS NULL'
 
         if self.db == model_db and connection.vendor in ("sqlite", "postgresql", "oracle"):
