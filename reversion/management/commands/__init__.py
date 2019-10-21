@@ -1,5 +1,5 @@
-from __future__ import unicode_literals
 from django.apps import apps
+from django.conf import settings
 from django.contrib import admin
 from django.core.management.base import BaseCommand, CommandError
 from reversion.revisions import is_registered
@@ -8,7 +8,7 @@ from reversion.revisions import is_registered
 class BaseRevisionCommand(BaseCommand):
 
     def add_arguments(self, parser):
-        super(BaseRevisionCommand, self).add_arguments(parser)
+        super().add_arguments(parser)
         parser.add_argument(
             "app_label",
             metavar="app_label",
@@ -28,7 +28,8 @@ class BaseRevisionCommand(BaseCommand):
 
     def get_models(self, options):
         # Load admin classes.
-        admin.autodiscover()
+        if "django.contrib.admin" in settings.INSTALLED_APPS:
+            admin.autodiscover()
         # Get options.
         app_labels = options["app_label"]
         # Parse model classes.
