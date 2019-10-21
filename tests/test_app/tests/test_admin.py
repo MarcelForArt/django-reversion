@@ -12,12 +12,12 @@ from test_app.tests.base import TestBase, LoginMixin
 class AdminMixin(TestBase):
 
     def setUp(self):
-        super(AdminMixin, self).setUp()
+        super().setUp()
         admin.site.register(TestModelParent, VersionAdmin)
         self.reloadUrls()
 
     def tearDown(self):
-        super(AdminMixin, self).tearDown()
+        super().tearDown()
         admin.site.unregister(TestModelParent)
         self.reloadUrls()
 
@@ -40,9 +40,7 @@ class AdminAddViewTest(LoginMixin, AdminMixin, TestBase):
         })
         obj = TestModelParent.objects.get()
         self.assertSingleRevision(
-            (obj, obj.testmodel_ptr), user=self.user,
-            # Django 1.8 gives "Initial version.", Django > 1.8 "Added."
-            comment=re.compile(r"(Initial version\.|Added\.)")
+            (obj, obj.testmodel_ptr), user=self.user, comment="Added."
         )
 
 
@@ -56,7 +54,8 @@ class AdminUpdateViewTest(LoginMixin, AdminMixin, TestBase):
         })
         self.assertSingleRevision(
             (obj, obj.testmodel_ptr), user=self.user,
-            comment="Changed name and parent_name."
+            # Django 3.0 changed formatting a bit.
+            comment=re.compile(r"Changed [nN]ame and [pP]arent[ _]name\.")
         )
 
 
@@ -71,7 +70,7 @@ class AdminChangelistView(LoginMixin, AdminMixin, TestBase):
 class AdminRevisionViewTest(LoginMixin, AdminMixin, TestBase):
 
     def setUp(self):
-        super(AdminRevisionViewTest, self).setUp()
+        super().setUp()
         with reversion.create_revision():
             self.obj = TestModelParent.objects.create()
         with reversion.create_revision():
@@ -132,7 +131,7 @@ class AdminRevisionViewTest(LoginMixin, AdminMixin, TestBase):
 class AdminRecoverViewTest(LoginMixin, AdminMixin, TestBase):
 
     def setUp(self):
-        super(AdminRecoverViewTest, self).setUp()
+        super().setUp()
         with reversion.create_revision():
             obj = TestModelParent.objects.create()
         obj.delete()
@@ -189,12 +188,12 @@ class AdminHistoryViewTest(LoginMixin, AdminMixin, TestBase):
 class AdminQuotingTest(LoginMixin, AdminMixin, TestBase):
 
     def setUp(self):
-        super(AdminQuotingTest, self).setUp()
+        super().setUp()
         admin.site.register(TestModelEscapePK, VersionAdmin)
         self.reloadUrls()
 
     def tearDown(self):
-        super(AdminQuotingTest, self).tearDown()
+        super().tearDown()
         admin.site.unregister(TestModelEscapePK)
         self.reloadUrls()
 
@@ -240,12 +239,12 @@ class TestModelParentAdmin(VersionAdmin):
 class AdminRegisterInlineTest(TestBase):
 
     def setUp(self):
-        super(AdminRegisterInlineTest, self).setUp()
+        super().setUp()
         admin.site.register(TestModelParent, TestModelParentAdmin)
         self.reloadUrls()
 
     def tearDown(self):
-        super(AdminRegisterInlineTest, self).tearDown()
+        super().tearDown()
         admin.site.unregister(TestModelParent)
         self.reloadUrls()
 
