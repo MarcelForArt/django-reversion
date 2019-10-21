@@ -132,30 +132,66 @@ class VersionQuerySet(models.QuerySet):
     def get_deleted(self, model, model_db=None):
         model_db = model_db or router.db_for_write(model)
         connection = connections[self.db]
+
+        # If safedelete is being used then this function helps
+        # determine if our model is a SafeDeleteModel. If not installed
+        # then never is.
+        try:
+            from safedelete.models import is_safedelete_cls
+        except ImportError:
+            is_safedelete_cls = lambda: False
+
         if self.db == model_db and connection.vendor in ("sqlite", "postgresql", "oracle"):
-            model_qs = (
-                model._default_manager
-                .using(model_db)
-                .annotate(_pk_to_object_id=Cast("pk", Version._meta.get_field("object_id")))
-                .filter(_pk_to_object_id=models.OuterRef("object_id"))
-            )
-            subquery = (
-                self.get_for_model(model, model_db=model_db)
-                .annotate(pk_not_exists=~models.Exists(model_qs))
-                .filter(pk_not_exists=True)
-                .values("object_id")
-                .annotate(latest_pk=models.Max("pk"))
-                .values("latest_pk")
-            )
+            if is_safedelete_cls(model):
+                # Hack: added this hack to account for safe-delete
+                # How about checking that SafeDeleteModel was base class?
+                # Instead of checking model_id is NULL we want to checked deleted is NOT NULL
+                # Might need to change the default_manager
+                model_qs = (
+                    model._default_manager
+                        .using(model_db)
+                        .annotate(_pk_to_object_id=Cast("pk", Version._meta.get_field("object_id")))
+                        .filter(_pk_to_object_id=models.OuterRef("object_id"), deleted__isnull=False)
+                )
+                subquery = (
+                    self.get_for_model(model, model_db=model_db)
+                        .annotate(pk_not_exists=~models.Exists(model_qs))
+                        .filter(pk_not_exists=True)
+                        .values("object_id")
+                        .annotate(latest_pk=models.Max("pk"))
+                        .values("latest_pk")
+                )
+            else:
+                model_qs = (
+                    model._default_manager
+                    .using(model_db)
+                    .annotate(_pk_to_object_id=Cast("pk", Version._meta.get_field("object_id")))
+                    .filter(_pk_to_object_id=models.OuterRef("object_id"))
+                )
+                subquery = (
+                    self.get_for_model(model, model_db=model_db)
+                    .annotate(pk_not_exists=~models.Exists(model_qs))
+                    .filter(pk_not_exists=True)
+                    .values("object_id")
+                    .annotate(latest_pk=models.Max("pk"))
+                    .values("latest_pk")
+                )
         else:
-            # We have to use a slow subquery.
-            subquery = self.get_for_model(model, model_db=model_db).exclude(
-                object_id__in=list(
-                    model._default_manager.using(model_db).values_list("pk", flat=True).order_by().iterator()
-                ),
-            ).values_list("object_id").annotate(
-                latest_pk=models.Max("pk")
-            ).order_by().values_list("latest_pk", flat=True)
+            if is_safedelete_cls(model):
+                # Hack: added this hack to account for safe-delete
+                # How about checking that SafeDeleteModel was base class?
+                # Instead of checking model_id is NULL we want to checked deleted is NOT NULL
+                # TODO
+                pass
+            else:
+                # We have to use a slow subquery.
+                subquery = self.get_for_model(model, model_db=model_db).exclude(
+                    object_id__in=list(
+                        model._default_manager.using(model_db).values_list("pk", flat=True).order_by().iterator()
+                    ),
+                ).values_list("object_id").annotate(
+                    latest_pk=models.Max("pk")
+                ).order_by().values_list("latest_pk", flat=True)
         # Perform the subquery.
         return self.filter(pk__in=subquery)
 
