@@ -2,6 +2,20 @@
 django-reversion
 ================
 
+Marcel changes
+=============
+
+We adapt the code to work with `django-safedelete`. In particular the
+`models.py` method `get_deleted` is customized. Originally it fetches the latest
+version which refers to an object instance that no longer exists. But since
+with safedelete we never really delete an object instance, we have to modify so
+that it fetches the latest instance which referes to an object that no longer
+exists with `deleted=null` field (after safe-deletion that `deleted` field gets
+set to the datetime of deletion).
+
+We also modify `revisions.py` method `add_to_revision` so that we don't create
+version for safe-deleted objects, just like we don't for hard-deleted objects and things behave.
+
 |PyPI latest| |PyPI Version| |PyPI License| |TravisCI| |Docs|
 
 
